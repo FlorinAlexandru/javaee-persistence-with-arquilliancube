@@ -1,0 +1,18 @@
+version: '3'
+services:
+  mongo-test-db:
+    image: mongo:latest
+    environment:
+      - MONGO-INITDB-DATABASE=pandadb
+      - MONGO-INITDB_ROOT_USERNAME=panda
+      - MONGO-INITDB_ROOT_PASSWORD=pass
+    ports:
+      - 27117:27017
+  postgres-test-db:
+    image: library/postgres:latest
+    environment:
+      - POSTGRES_USER=panda
+      - POSTGRES_PASSWORD=panda
+      - POSTGRES_DB=pandadb
+    ports:
+      - 25432:5432

@@ -1,0 +1,19 @@
+{
+  "bears": [
+    {
+      "firstName": "grizz",
+      "lastName": "the bear",
+      "age": 3
+    },
+    {
+      "firstName": "panpan",
+      "lastName": "the bear",
+      "age": 3
+    },
+    {
+      "firstName": "icebear",
+      "lastName": "the bear",
+      "age": 4
+    }
+  ]
+}
