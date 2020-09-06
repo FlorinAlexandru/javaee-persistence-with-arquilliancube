@@ -1,0 +1,369 @@
+= Create Java EE project with persistence using Arquillian Cube
+
+== Steps
+
+In this tutorial I will show you the basic steps to test an Java EE web application using Arquillian Cube. We will use both NoSQL and SQL databases (MongoDb and Postgresql).
+[start=1]
+. *Create the Maven project*
+
+We will use an Maven archetype to create the base structure for our project.
+
+[source, bash]
+----
+mvn "-DarchetypeGroupId=org.codehaus.mojo.archetypes"
+    "-DarchetypeArtifactId=webapp-javaee7"
+    "-DarchetypeVersion=1.1"
+    "-DgroupId=org.happypanda.persistence"
+    "-DartifactId=persistence"
+    "-Dversion=1.1.1"
+    archetype:generate
+----
+
+[start=2]
+. *Add arquillian-bom dependency in dependencyManagement*
+
+[source,xml]
+----
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.jboss.arquillian</groupId>
+                <artifactId>arquillian-bom</artifactId>
+                <version>1.1.15.Final</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+----
+
+[start=3]
+. *Add junit, arquillian-junit-container, wildfly managed container*
+
+[source,xml]
+----
+    <dependency>
+        <groupId>org.wildfly</groupId>
+        <artifactId>wildfly-arquillian-container-managed</artifactId>
+        <version>8.2.0.Final</version>
+        <scope>test</scope>
+        <exclusions>
+            <exclusion>
+                <groupId>sun.jdk</groupId>
+                <artifactId>jconsole</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    <dependency>
+        <groupId>org.jboss.arquillian.junit</groupId>
+        <artifactId>arquillian-junit-container</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.12</version>
+        <scope>test</scope>
+    </dependency>
+----
+
+[start=4]
+. *Add persistence dependency*
+
+[source,xml]
+----
+    <dependency>
+        <groupId>javax.persistence</groupId>
+        <artifactId>javax.persistence-api</artifactId>
+        <version>2.2</version>
+        <scope>provided</scope>
+    </dependency>
+----
+
+[start=5]
+. *Add persistence.xml file unde /resources/META-INF*
+
+The persistence.xml is where one configures all the properties for the persistence layer. It defines one or more persistence unit. A persistence unit defines a set of all entity classes that are managed by EntityManager instances in an application.
+
+For use in testing, the persistence.xml file will be placed under _src/test/resources_. For production purpose, it will be placed unde _src/main/resources/META-INF_.
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_2.xsd"
+             version="2.2">
+    <persistence-unit name="inmemory" transaction-type="JTA">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <properties>
+            <property name="connection.driver_class" value="org.h2.Driver"/>
+            <property name="hibernate.connection.url" value="jdbc:h2:file:testdb"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.H2Dialect"/>
+            <property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+            <property name="hibernate.show_sql" value="true" />
+            <property name="javax.persistence.sql-load-script-source" value="insert.sql"/>
+        </properties>
+    </persistence-unit>
+</persistence>
+----
+
+Pease note that the above examples contains some minimal configuration. There are many more properties to use. See the documentation.
+
+[start=6]
+. *Create arquillian.xml file*
+
+Create the arquillian.xml under _src/test/resources_ file and set the jboss home property.
+
+[source,xml]
+----
+<container qualifier="widlfly-managed" default="true">
+    <configuration>
+        <property name="jbossHome">${jbossHome:target/wildfly-8.2.0.Final}</property>
+    </configuration>
+</container>
+----
+
+Without this property, when running the test, an error will be thrown stating that the container cannot be started.
+
+[start=7]
+. *Create the arquillian test*
+The arquillian test has some specific configurations in order to make it work.
+
+* Add the appropriate annotation
+
+To run a test using Arquillian, the test class must be annotated with `@RunWith(Arquillian.class)`
+
+* Add the deployment method.
+
+The deployment method's scope is to package all the code and it's dependencies and create a archive (war or jar). To differentiate the deployment method from other metods in the test class, `@Deployment` annotation is used.
+
+[source,java]
+----
+@Deployment
+public static JavaArchive createDeployment() {
+    return ShrinkWrap.create(JavaArchive.class)
+            .addClass(MyClass.class)
+            .addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
+----
+
+A full test class example:
+
+[source,java]
+----
+@RunWith(Arquillian.class)
+public class MessageDaoTest {
+    @Deployment
+    public static WebArchive createDeployment() {
+        WebArchive webArchive = ShrinkWrap.create(WebArchive.class)
+                .addClasses(MessageDao.class, Message.class)
+                .addAsResource("persistence.xml", ArchivePaths.create("META-INF/persistence.xml"))
+                .addAsResource("insert.sql", ArchivePaths.create("insert.sql"))
+                .addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
+        System.out.println(webArchive.toString());
+        return webArchive;
+    }
+}
+----
+
+When packaging with Shrinkwrap, resources can be added to the archive. One example is the SQL script used to populate the database. Another example is the persistence.xml configuration file. Please note that the persistence.xml file must be put under _META-INF folder_.
+
+
+== References
+
+https://arquillian.org/guides/getting_started/
+
+https://arquillian.org/guides/getting_started_rinse_and_repeat/
+
+https://arquillian.org/guides/shrinkwrap_introduction/
+
+https://thorben-janssen.com/standardized-schema-generation-data-loading-jpa-2-1/
+
+https://vladmihalcea.com/jpa-persistence-xml/
+
+
+== Using Docker containers to run SQL and NoSQL databases
+
+=== Arquillian cube
+
+Arquillian Cube is an Arquillian extension that can be used to manager Docker containers from Arquillian.
+
+[start=1]
+. *Config Docker*
+With this extension you can start a Docker container with a server installed, deploy the required deployable file within it and execute Arquillian tests.
+
+Because arquillian-cube uses docker, we need to make some docker setup. For Windows, open Docker config and check _"Expose daemon on tcp://localhost:2375 without TLS"_.
+
+[start=2]
+. *Add arquillian-cube dependency*
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.arquillian.cube</groupId>
+    <artifactId>arquillian-cube-docker</artifactId>
+    <version>${org.arquillian.cube.version}</version>
+    <scope>test</scope>
+</dependency>
+----
+
+[start=3]
+. *Add the extension in arquillian.xml file*
+
+[source,xml]
+----
+<extension qualifier="docker">
+    <property name="serverVersion">1.15</property>
+    <property name="serverUri">tcp://localhost:2375</property>
+    <property name="definitionFormat">COMPOSE</property>
+    <property name="dockerContainersFile">docker-compose.yml</property>
+</extension>
+----
+
+The _dockerContainersFile_ property allows to set the path to the docker compose and the _definitionFormat_ sets the format of content expressed in dockerContainers attribute or in file set in dockerContainersFile.
+
+[NOTE]
+====
+See http://arquillian.org/arquillian-cube/#_configuration for more informations.
+====
+
+=== SQL database
+
+Add Postgresql dependency:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <version>42.2.14</version>
+</dependency>
+----
+
+Add arquillian container dbunit
+[source,xml]
+----
+<dependency>
+    <groupId>org.arquillian.universe</groupId>
+    <artifactId>arquillian-ape-sql-container-dbunit</artifactId>
+    <scope>test</scope>
+    <type>pom</type>
+</dependency>
+----
+
+Create the test
+
+[source,java]
+----
+@Test
+@org.arquillian.ape.rdbms.UsingDataSet("datasets/persons.xml")
+public void shouldFindAll() {
+    List<Person> messages = personDao.findAll();
+    assertThat(messages.size()).isEqualTo(1);
+}
+----
+
+The configuration of the SQL database is persistence.xml file. The persistence file must be copied into the ShrinkWrap archive at deployment time.
+
+[source,java]
+----
+    @Deployment
+    public static WebArchive createDeployment() {
+        JavaArchive[] javaArchives = Maven.resolver().resolve(
+                "org.assertj:assertj-core:3.15.0",
+                "org.arquillian.cube:arquillian-cube-docker:1.18.2",
+                "org.mongodb:mongo-java-driver:3.4.3")
+                .withTransitivity().as(JavaArchive.class);
+
+        WebArchive war = ShrinkWrap.create(WebArchive.class, "app.war")
+
+                .addClasses(PersonDao.class, Person.class)
+                .addClasses(MongoProducer.class, PropertyProducer.class, Property.class)
+                .addPackages(true, "com.lordofthejars.nosqlunit")
+                .addAsLibraries(javaArchives)
+                .addAsResource("test-persistence.xml", ArchivePaths.create("META-INF/persistence.xml"))
+                .addAsResource("META-INF/application.properties", ArchivePaths.create("META-INF/application.properties"))
+                .addAsResource("datasets/", ArchivePaths.create("datasets/"))
+                .addAsManifestResource(EmptyAsset.INSTANCE, ArchivePaths.create("beans.xml"));
+        return war;
+----
+
+
+=== NoSql database
+
+==== Steps
+
+In this part we will use add a NoSQL database to our project and we will do some integration test against it.
+
+
+[start=1]
+. *Add Mongo image*
+In order to use Mongo database with arquillian-cube we need to define the configuration of the container. This is done inside the docker compose file:
+
+[source,yaml]
+----
+version: '3'
+services:
+  mongo-test-db:
+    image: mongo:latest
+    environment:
+      - MONGO-INITDB-DATABASE=pandadb
+      - MONGO-INITDB_ROOT_USERNAME=panda
+      - MONGO-INITDB_ROOT_PASSWORD=pass
+    ports:
+    - 27117:27017
+----
+
+Here we set the database, the root username and root password. Also we map the mongo port inside the container(21017) with a host port (27117).
+
+
+[start=2]
+. *Add arquillian-ape-nosql and mongo driver dependencies*
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.arquillian.universe</groupId>
+    <artifactId>arquillian-ape-nosql-mongodb</artifactId>
+    <scope>test</scope>
+    <type>pom</type>
+</dependency>
+<dependency>
+    <groupId>org.mongodb</groupId>
+    <artifactId>mongo-java-driver</artifactId>
+    <version>3.4.3</version>
+</dependency>
+----
+
+[start=3]
+. *Create the test*
+
+First add the Junit rule in which you set database parameters like hostname, port, user, password, database.
+
+[source,java]
+----
+@Rule
+public MongoDbRule mongoDbRule = new MongoDbRule(MongoDbConfigurationBuilder.mongoDb()
+        .host("localhost")
+        .port(27117)
+        .databaseName("pandadb")
+        .build());
+----
+
+Create the test method
+[source,java]
+----
+@Test
+@UsingDataSet(locations = "/datasets/initialData.json")
+public void shouldGetAllFromMongo() {
+    ArrayList<Document> documents = producer.getMongoClient().getDatabase("pandadb").getCollection("bears").find().into(new ArrayList<>());
+     documents.forEach(System.out::println);
+     assertThat(documents.size()).isEqualTo(7);
+    }
+----
+
+To seed the database we use the `@UsintDataSet` annotation. It will read a json file and will fill the database accordingly. The test files are under _src/test/resources/datasets_.
+
+== References
+
+http://arquillian.org/arquillian-cube/
