@@ -5,9 +5,8 @@
     <groupId>org.happypanda.persistence</groupId>
     <artifactId>persistence-with-arquilliancube</artifactId>
     <version>1.0.0</version>
-    <packaging>war</packaging>
-
     <name>persistence-with-arquilliancube</name>
+    <packaging>war</packaging>
 
     <properties>
         <endorsed.dir>${project.build.directory}/endorsed</endorsed.dir>
@@ -24,7 +23,7 @@
         <version.arquillian_universe>1.2.0.1</version.arquillian_universe>
     </properties>
     
-<profiles>
+    <profiles>
         <profile>
             <id>arq-wildfly-managed</id>
             <activation>
@@ -71,6 +70,9 @@
                             </execution>
                         </executions>
                         <configuration>
+                            <systemPropertyVariables>
+                                <arquillian.launch>wildfly-managed</arquillian.launch>
+                            </systemPropertyVariables>
                             <excludes>
                                 <exclude>**/Test*.java</exclude>
                                 <exclude>**/*Test.java</exclude>
@@ -109,6 +111,67 @@
             </build>
         </profile>
         <profile>
+            <id>arq-wildfly-remote</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.wildfly.arquillian</groupId>
+                    <artifactId>wildfly-arquillian-container-remote</artifactId>
+                    <version>2.1.1.Final</version>
+                    <scope>test</scope>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>sun.jdk</groupId>
+                            <artifactId>jconsole</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+            </dependencies>
+            <build>
+                <testResources>
+                    <testResource>
+                        <directory>src/test/resources</directory>
+                    </testResource>
+                </testResources>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>${maven-surefire-plugin.version}</version>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>${maven-failsafe-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <trimStackTrace>false</trimStackTrace>
+                            <systemPropertyVariables>
+                                <arquillian.launch>wildfly-remote</arquillian.launch>
+                            </systemPropertyVariables>
+                            <includes>
+                                <include>**/*DockerIT.java</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/Test*.java</exclude>
+                                <exclude>**/*Test.java</exclude>
+                                <exclude>**/*Tests.java</exclude>
+                                <exclude>**/*TestCase.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>cube</id>
             <dependencies>
                 <dependency>
@@ -122,11 +185,6 @@
                             <artifactId>jconsole</artifactId>
                         </exclusion>
                     </exclusions>
-                </dependency>
-                <dependency>
-                    <groupId>org.jboss.arquillian.junit</groupId>
-                    <artifactId>arquillian-junit-container</artifactId>
-                    <scope>test</scope>
                 </dependency>
             </dependencies>
             <build>
